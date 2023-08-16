@@ -110,8 +110,6 @@ them."
                    ;; start position
                    (org-fragtog--frag-start cursor-frag)
                    prev-frag-start-pos))
-       ;; The current fragment changed
-       (frag-changed (not frag-same))
        ;; The fragment at position of previous fragment.
        ;; This can be nil when for example $foo$ is edited to become $foo $.
        (frag-at-prev-pos (and prev-frag-start-pos
@@ -120,7 +118,7 @@ them."
                                 (org-fragtog--cursor-frag)))))
 
     ;; Only do anything if the current fragment changed
-    (when frag-changed
+    (unless frag-same
       ;; Current fragment is the new previous
       (setq org-fragtog--prev-frag cursor-frag)
       ;; Enable fragment if cursor left it after a timed disable
@@ -141,7 +139,6 @@ them."
                                                           cursor-frag
                                                           t))
           (org-fragtog--disable-frag cursor-frag))))
-
     (setq org-fragtog--prev-point (point))))
 
 (defun org-fragtog--frag-enabled (frag)
@@ -174,20 +171,26 @@ A fragment is enabled when it has a preview image overlay in the buffer."
 If there is none, return nil.
 If the fragment is ignored from rules in `org-fragtog-ignore-predicates',
 return nil."
-  (let*
-      ;; Element surrounding the cursor
-      ((elem (org-element-context))
-       ;; A LaTeX fragment or environment is surrounding the cursor
-       (elem-is-latex (and (member (org-element-type elem)
-                                   '(latex-fragment latex-environment))
-                           (< (point) (org-fragtog--frag-end elem))))
-       ;; Whether the fragment should be ignored
-       (should-ignore (run-hook-with-args-until-success
-                       'org-fragtog-ignore-predicates)))
-
-    (if (and elem-is-latex (not should-ignore))
-        elem
-      nil)))
+  ;; Check for latex-is-latex right at start
+  ;; Regexp is much faster
+  (let ((latex-begin-regexp "\\$\\|\\$\\$\\|\\\\(\\|\\\\\\[\\|\\\\]\\|\\\\)"))
+    (when (or (looking-at-p latex-begin-regexp)
+              (save-excursion
+                (goto-char (- (point) 1))
+                (looking-at-p latex-begin-regexp))
+              (org-inside-LaTeX-fragment-p))
+      (let*
+          ;; Element surrounding the cursor
+          ((elem (org-element-context))
+           ;; A LaTeX fragment or environment is surrounding the cursor
+           (elem-is-latex (and (member (org-element-type elem)
+                                       '(latex-fragment latex-environment))
+                               (< (point) (org-fragtog--frag-end elem))))
+           ;; Whether the fragment should be ignored
+           (should-ignore (run-hook-with-args-until-success
+                           'org-fragtog-ignore-predicates)))
+        (unless should-ignore
+          elem)))))
 
 (defun org-fragtog--enable-frag (frag)
   "Enable the Org LaTeX fragment preview for the fragment FRAG."
