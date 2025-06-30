@@ -192,6 +192,10 @@ return nil."
         (unless should-ignore
           elem)))))
 
+(defvar org-fragtog-use-math-preview nil
+  "Use `math-preview' instead of `org-latex-preview'.
+Must have `math-preview' installed and configured.")
+
 (defun org-fragtog--enable-frag (frag)
   "Enable the Org LaTeX fragment preview for the fragment FRAG."
 
@@ -212,7 +216,9 @@ return nil."
     ;; point when point is on whitespace before the fragment.
     ;; So, advance to the nearest non-whitespace character before enabling.
     (re-search-forward "[^ \t]")
-    (ignore-errors (org-latex-preview))))
+    (if org-fragtog-use-math-preview
+        (ignore-errors (math-preview-at-point))
+      (ignore-errors (org-latex-preview)))))
 
 (defun org-fragtog--set-point-after-disable-frag (frag)
   "Set point to where it should be after FRAG was disabled.
@@ -248,8 +254,12 @@ If RENEW is non-nil, renew the fragment at point."
 
   ;; There may be nothing at the adjusted point
   (when frag
-    (org-clear-latex-preview (org-fragtog--frag-start frag)
-                             (org-fragtog--frag-end frag))
+    (let ((beg (org-fragtog--frag-start frag))
+          (end (org-fragtog--frag-end frag)))
+      (if org-fragtog-use-math-preview
+          (math-preview-clear-at-point)
+        (org-clear-latex-preview (org-fragtog--frag-start frag)
+                                 (org-fragtog--frag-end frag))))
     (org-fragtog--set-point-after-disable-frag frag)))
 
 (provide 'org-fragtog)
